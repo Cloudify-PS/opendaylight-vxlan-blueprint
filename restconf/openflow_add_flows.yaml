@@ -1,0 +1,70 @@
+rest_calls:
+  - path: '/restconf/config/opendaylight-inventory:nodes/node/openflow:{{openflow_id}}/table/0'
+    method: PUT
+    headers:
+      Content-type : 'application/json'
+      authorization: 'Basic YWRtaW46YWRtaW4='
+    response_format: raw
+    payload:
+      table:
+      - id: 0
+        "flow-node-inventory:flow":
+        - id: '{{local_endpoint["bridge_id"]}}_from'
+          priority: 220
+          table_id: 0
+          match:
+            ethernet-match:
+              ethernet-type:
+                type: 2048
+            ipv4-source: '{{remote_endpoint["subnet_cidr"]}}'
+            in-port: '2'
+          instructions:
+            instruction:
+            - order: 0
+              apply-actions:
+                action:
+                - order: 2
+                  output-action:
+                    max-length: 0
+                    output-node-connector: '1'
+                - order: 1
+                  set-field:
+                    ethernet-match:
+                      ethernet-destination:
+                        address: '{{local_endpoint["instance_interface_mac"]}}'
+                - order: 0
+                  set-field:
+                    ethernet-match:
+                      ethernet-source:
+                        address: '{{local_endpoint["bridge_interface_mac"]}}'
+        - id: '{{local_endpoint["bridge_id"]}}_to'
+          priority: 210
+          table_id: 0
+          match:
+            ethernet-match:
+              ethernet-type:
+                type: 2048
+            ipv4-source: '{{local_endpoint["subnet_cidr"]}}'
+            in-port: '1'
+          instructions:
+            instruction:
+            - order: 0
+              apply-actions:
+                action:
+                - order: 0
+                  output-action:
+                    max-length: 0
+                    output-node-connector: '2'
+        - id: '{{local_endpoint["bridge_id"]}}_local'
+          priority: 202
+          table_id: 0
+          match: {}
+          instructions:
+            instruction:
+            - order: 0
+              apply-actions:
+                action:
+                - order: 0
+                  output-action:
+                    max-length: 0
+                    output-node-connector: 'LOCAL'

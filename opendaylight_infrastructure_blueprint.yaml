@@ -1,0 +1,554 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+description: >
+  Blueprint setup OpenDaylight, 2 OvSes, client and server on OpenStack
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/4.2/types.yaml
+  - http://www.getcloudify.org/spec/openstack-plugin/2.2.0/plugin.yaml
+  - http://www.getcloudify.org/spec/utilities-plugin/1.4.1/plugin.yaml
+  - https://raw.githubusercontent.com/cloudify-incubator/cloudify-utilities-plugin/1.4.1/cloudify_cloudinit/types.yaml
+  - imports/cloud_config.yaml
+
+inputs:
+  prefix:
+    type: string
+    default: 'demo_sdn'
+
+  a_end_subnet_cidr:
+    type: string
+    default: '192.168.2.0/24'
+
+  transit_subnet_cidr:
+    type: string
+    default: '192.168.1.0/24'
+
+  z_end_subnet_cidr:
+    type: string
+    default: '192.168.3.0/24'
+
+dsl_definitions:
+  openstack_config: &openstack_config
+    username: { get_secret: keystone_username }
+    password: { get_secret: keystone_password }
+    tenant_name: { get_secret: keystone_tenant_name }
+    auth_url: { get_secret: keystone_url }
+    region: RegionOne
+
+node_templates:
+  # Security groups
+  traffic_sg:
+    type: cloudify.openstack.nodes.SecurityGroup
+    properties:
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: null
+          port_range_max: null
+          protocol: icmp
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 22
+          port_range_max: 22
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 80
+          port_range_max: 80
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 8080
+          port_range_max: 8080
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 8181
+          port_range_max: 8181
+          protocol: tcp
+      resource_id: { concat: [{ get_input: prefix }, '_traffic_sg'] }
+      openstack_config: *openstack_config
+
+  management_sg:
+    type: cloudify.openstack.nodes.SecurityGroup
+    properties:
+      rules:
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 22
+         port_range_max: 22
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 6633
+         port_range_max: 6633
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 6640
+         port_range_max: 6640
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 6653
+         port_range_max: 6653
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 53
+         port_range_max: 53
+         protocol: udp
+      resource_id: { concat: [{ get_input: prefix }, '_management_sg'] }
+      openstack_config: *openstack_config
+
+  transit_sg:
+    type: cloudify.openstack.nodes.SecurityGroup
+    properties:
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: null
+          port_range_max: null
+          protocol: icmp
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 4789
+          port_range_max: 4789
+          protocol: tcp
+        - remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 4789
+          port_range_max: 4789
+          protocol: udp
+      resource_id: { concat: [{ get_input: prefix }, '_transit_sg'] }
+      openstack_config: *openstack_config
+
+  external_sg:
+    type: cloudify.openstack.nodes.SecurityGroup
+    properties:
+      rules:
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 22
+         port_range_max: 22
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 80
+         port_range_max: 80
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 443
+         port_range_max: 443
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 1099
+         port_range_max: 1099
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 8080
+         port_range_max: 8080
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 8181
+         port_range_max: 8181
+         protocol: tcp
+       - remote_ip_prefix: 0.0.0.0/0
+         port_range_min: 53
+         port_range_max: 53
+         protocol: udp
+      resource_id: { concat: [{ get_input: prefix }, '_external_sg'] }
+      openstack_config: *openstack_config
+
+  # Networks
+  a_end_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_a_end_network'] }
+      openstack_config: *openstack_config
+
+  a_end_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      subnet:
+        ip_version: 4
+        cidr: { get_input: a_end_subnet_cidr }
+        dns_nameservers: ['8.8.4.4', '8.8.8.8']
+      resource_id: { concat: [{ get_input: prefix }, '_a_end_subnet'] }
+      openstack_config: *openstack_config
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: a_end_network
+
+  transit_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_transit_network'] }
+      openstack_config: *openstack_config
+
+  transit_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      subnet:
+        ip_version: 4
+        cidr: { get_input: transit_subnet_cidr }
+        dns_nameservers: ['8.8.4.4', '8.8.8.8']
+      resource_id: { concat: [{ get_input: prefix }, '_transit_subnet'] }
+      openstack_config: *openstack_config
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: transit_network
+
+  z_end_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_z_end_network'] }
+      openstack_config: *openstack_config
+
+  z_end_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      subnet:
+        ip_version: 4
+        cidr: { get_input: z_end_subnet_cidr }
+        dns_nameservers: ['8.8.4.4', '8.8.8.8']
+      resource_id: { concat: [{ get_input: prefix }, '_z_end_subnet'] }
+      openstack_config: *openstack_config
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: z_end_network
+
+  # Ports
+  client_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_client_port'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs:
+                - ip_address: "0.0.0.0/0"
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: a_end_network
+      - type: cloudify.openstack.port_connected_to_subnet
+        target: a_end_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: traffic_sg
+
+  a_end_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_a_end_port'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs:
+                - ip_address: "0.0.0.0/0"
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: a_end_network
+      - type: cloudify.openstack.port_connected_to_subnet
+        target: a_end_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: traffic_sg
+
+  a_end_transit_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_a_end_transit_port'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs:
+                - ip_address: "0.0.0.0/0"
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: transit_network
+      - type: cloudify.openstack.port_connected_to_subnet
+        target: transit_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: transit_sg
+
+  z_end_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_z_end_port'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs:
+                - ip_address: "0.0.0.0/0"
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: z_end_network
+      - type: cloudify.openstack.port_connected_to_subnet
+        target: z_end_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: traffic_sg
+
+  z_end_transit_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_z_end_transit_port'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs:
+                - ip_address: "0.0.0.0/0"
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: transit_network
+      - type: cloudify.openstack.port_connected_to_subnet
+        target: transit_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: transit_sg
+
+  server_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      resource_id: { concat: [{ get_input: prefix }, '_server_port'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs:
+                - ip_address: "0.0.0.0/0"
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: z_end_network
+      - type: cloudify.openstack.port_connected_to_subnet
+        target: z_end_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: traffic_sg
+
+  # Floating IPs
+  ovs_a_floating_ip:
+    type: cloudify.openstack.nodes.FloatingIP
+    properties:
+      floatingip:
+        floating_network_name: { get_secret: external_network_name }
+      openstack_config: *openstack_config
+
+  ovs_z_floating_ip:
+    type: cloudify.openstack.nodes.FloatingIP
+    properties:
+      floatingip:
+        floating_network_name: { get_secret: external_network_name }
+      openstack_config: *openstack_config
+
+  odl_floating_ip:
+    type: cloudify.openstack.nodes.FloatingIP
+    properties:
+      floatingip:
+        floating_network_name: { get_secret: external_network_name }
+      openstack_config: *openstack_config
+      
+  server_floating_ip:
+    type: cloudify.openstack.nodes.FloatingIP
+    properties:
+      floatingip:
+        floating_network_name: { get_secret: external_network_name }
+      openstack_config: *openstack_config
+
+  client_floating_ip:
+    type: cloudify.openstack.nodes.FloatingIP
+    properties:
+      floatingip:
+        floating_network_name: { get_secret: external_network_name }
+      openstack_config: *openstack_config
+
+  # VMs
+  server_vm:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        install_method: none
+      management_network_name: { get_secret: private_network_name }
+      resource_id: { concat: [{ get_input: prefix }, '_server'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              image: { get_secret: centos_core_image }
+              flavor: { get_secret: small_image_flavor }
+              userdata: { get_attribute: [ server_cloud_config, cloud_config ] }
+    relationships:
+      - type: cloudify.openstack.server_connected_to_port
+        target: server_port
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: traffic_sg
+      - type: cloudify.openstack.server_connected_to_floating_ip
+        target: server_floating_ip
+
+  client_vm:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        install_method: none
+      management_network_name: { get_secret: private_network_name }
+      resource_id: { concat: [{ get_input: prefix }, '_client'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              image: { get_secret: centos_core_image }
+              flavor: { get_secret: small_image_flavor }
+              userdata: { get_attribute: [ client_cloud_config, cloud_config ] }
+    relationships:
+      - type: cloudify.openstack.server_connected_to_port
+        target: client_port
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: traffic_sg
+      - type: cloudify.openstack.server_connected_to_floating_ip
+        target: client_floating_ip
+
+  ovs_a_vm:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        install_method: none
+      management_network_name: { get_secret: private_network_name }
+      resource_id: { concat: [{ get_input: prefix }, '_ovs_a'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              image: { get_secret: centos_core_image }
+              flavor: { get_secret: small_image_flavor }
+              userdata: { get_attribute: [ ovs_cloud_config, cloud_config ] }
+    relationships:
+      - type: cloudify.openstack.server_connected_to_port
+        target: a_end_port
+      - type: cloudify.openstack.server_connected_to_port
+        target: a_end_transit_port
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: management_sg
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: transit_sg
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: traffic_sg
+      - type: cloudify.openstack.server_connected_to_floating_ip
+        target: ovs_a_floating_ip
+
+  ovs_z_vm:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        install_method: none
+      management_network_name: { get_secret: private_network_name }
+      resource_id: { concat: [{ get_input: prefix }, '_ovs_z'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              image: { get_secret: centos_core_image }
+              flavor: { get_secret: small_image_flavor }
+              userdata: { get_attribute: [ ovs_cloud_config, cloud_config ] }
+    relationships:
+      - type: cloudify.openstack.server_connected_to_port
+        target: z_end_port
+      - type: cloudify.openstack.server_connected_to_port
+        target: z_end_transit_port
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: management_sg
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: transit_sg
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: traffic_sg
+      - type: cloudify.openstack.server_connected_to_floating_ip
+        target: ovs_z_floating_ip
+
+  odl_vm:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      agent_config:
+        install_method: none
+      management_network_name: { get_secret: private_network_name }
+      resource_id: { concat: [{ get_input: prefix }, '_odl'] }
+      openstack_config: *openstack_config
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              image: { get_secret: centos_core_image }
+              flavor: { get_secret: medium_image_flavor }
+              userdata: { get_attribute: [ odl_cloud_config, cloud_config ] }
+    relationships:
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: management_sg
+      - type: cloudify.openstack.server_connected_to_security_group
+        target: external_sg
+      - type: cloudify.openstack.server_connected_to_floating_ip
+        target: odl_floating_ip
+
+outputs:
+  service_configuration_inputs:
+    value:
+      odl_ip: { get_attribute: [ odl_vm, ip ] }
+      odl_port: '8181'
+      a_endpoint:
+        node_id: 'ovs_a'
+        node_ip: { get_attribute: [ ovs_a_vm, ip ] }
+        bridge_id: 'A'
+        bridge_interface_name: 'eth1'
+        bridge_interface_mac: { get_attribute: [ a_end_port, mac_address ] }
+        instance_interface_mac: { get_attribute: [ client_port, mac_address ] }
+        subnet_cidr: { get_property: [ a_end_subnet, subnet, cidr ] }
+        vtep_name: 'vtep1'
+        vtep_ip: { get_attribute: [ a_end_transit_port, fixed_ip_address ] }
+        datapath_id: '0000000000000001'
+      z_endpoint:
+        node_id: 'ovs_z'
+        node_ip: { get_attribute: [ ovs_z_vm, ip ] }
+        bridge_id: 'Z'
+        bridge_interface_name: 'eth1'
+        bridge_interface_mac: { get_attribute: [ z_end_port, mac_address ] }
+        instance_interface_mac: { get_attribute: [ server_port, mac_address ] }
+        subnet_cidr: { get_property: [ z_end_subnet, subnet, cidr ] }
+        vtep_name: 'vtep2'
+        vtep_ip: { get_attribute: [ z_end_transit_port, fixed_ip_address ] }
+        datapath_id: '0000000000000002'
+  client_config:
+    value:
+      - { concat: ['ip route add ', { get_property: [ z_end_subnet, subnet, cidr ] }, ' via ', { get_attribute: [ a_end_port, fixed_ip_address ] } ] }
+      - { concat: ['arp -s ', { get_attribute: [ a_end_port, fixed_ip_address ] }, ' ', { get_attribute: [ a_end_port, mac_address ] } ]}
+  server_config:
+    value:
+      - { concat: ['ip route add ', { get_property: [ a_end_subnet, subnet, cidr ] }, ' via ', { get_attribute: [ z_end_port, fixed_ip_address ] } ] }
+      - { concat: ['arp -s ', { get_attribute: [ z_end_port, fixed_ip_address ] }, ' ', { get_attribute: [ z_end_port, mac_address ] } ]}
+  topology:
+    value:
+      a_end_network:
+        client: { get_attribute: [ client_port, fixed_ip_address ] }
+        a_end_ovs: { get_attribute: [ a_end_port, fixed_ip_address ] }
+      transit_network:
+        a_end_ovs: { get_attribute: [ a_end_transit_port, fixed_ip_address ] }
+        z_end_ovs: { get_attribute: [ z_end_transit_port, fixed_ip_address ] }
+      z_end_network:
+        z_end_ovs: { get_attribute: [ z_end_port, fixed_ip_address ] }
+        server: { get_attribute: [ server_port, fixed_ip_address ] }
+      management_network:
+        client: { get_attribute: [ client_vm, ip ] }
+        a_end_ovs: { get_attribute: [ ovs_a_vm, ip ] }
+        z_end_ovs: { get_attribute: [ ovs_z_vm, ip ] }
+        server: { get_attribute: [ server_vm, ip ] }
+        odl: { get_attribute: [ odl_vm, ip ] }
+  access:
+    value:
+      client: { get_attribute: [ client_floating_ip, floating_ip_address ] }
+      a_end_ovs: { get_attribute: [ ovs_a_floating_ip, floating_ip_address ] }
+      z_end_ovs: { get_attribute: [ ovs_z_floating_ip, floating_ip_address ] }
+      server: { get_attribute: [ server_floating_ip, floating_ip_address ] }
+      odl: { get_attribute: [ odl_floating_ip, floating_ip_address ] }

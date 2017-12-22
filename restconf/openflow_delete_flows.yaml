@@ -1,0 +1,7 @@
+rest_calls:
+  - path: '/restconf/config/opendaylight-inventory:nodes/node/openflow:{{openflow_id}}'
+    method: DELETE
+    headers:
+      Content-type : 'application/json'
+      authorization: 'Basic YWRtaW46YWRtaW4='
+    response_format: raw

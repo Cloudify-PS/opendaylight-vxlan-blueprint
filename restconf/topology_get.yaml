@@ -1,0 +1,5 @@
+rest_calls:
+  - path: '/restconf/operational/network-topology:network-topology/'
+    method: GET
+    headers:
+      authorization: 'Basic YWRtaW46YWRtaW4='

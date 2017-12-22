@@ -1,0 +1,7 @@
+rest_calls:
+  - path: '/restconf/config/network-topology:network-topology/topology/ovsdb:1/node/{{endpoint["node_id"]}}%2Fbridge%2F{{endpoint["bridge_id"]}}'
+    method: DELETE
+    headers:
+      Content-type : 'application/json'
+      authorization: 'Basic YWRtaW46YWRtaW4='
+    response_format: raw

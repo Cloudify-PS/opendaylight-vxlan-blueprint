@@ -1,0 +1,32 @@
+rest_calls:
+  - path: '/restconf/config/network-topology:network-topology/topology/ovsdb:1/node/{{local_endpoint["node_id"]}}%2Fbridge%2F{{local_endpoint["bridge_id"]}}'
+    method: PUT
+    headers:
+      Content-type : 'application/json'
+      authorization: "Basic YWRtaW46YWRtaW4="
+    response_format: raw
+    payload:
+      "network-topology:node":
+        - node-id: '{{local_endpoint["node_id"]}}/bridge/{{local_endpoint["bridge_id"]}}'
+          "ovsdb:bridge-name": '{{local_endpoint["bridge_id"]}}'
+          "ovsdb:managed-by": '/network-topology:network-topology/network-topology:topology[network-topology:topology-id=''ovsdb:1'']/network-topology:node[network-topology:node-id=''{{local_endpoint["node_id"]}}'']'
+          "ovsdb:controller-entry":
+            - target: 'tcp:{{controller_ip}}:6633'
+          termination-point:
+            - tp-id: '{{local_endpoint["bridge_interface_name"]}}'
+              "ovsdb:name": '{{local_endpoint["bridge_interface_name"]}}'
+              "ovsdb:ofport": 1
+            - tp-id: '{{local_endpoint["vtep_name"]}}'
+              "ovsdb:name": '{{local_endpoint["vtep_name"]}}'
+              "ovsdb:interface-type": 'ovsdb:interface-type-vxlan'
+              "ovsdb:ofport": 2
+              "ovsdb:options":
+                - "ovsdb:option": 'remote_ip'
+                  "ovsdb:value": '{{remote_endpoint["vtep_ip"]}}'
+                - "ovsdb:option": 'local_ip'
+                  "ovsdb:value": '{{local_endpoint["vtep_ip"]}}'
+                - "ovsdb:option": 'key'
+                  "ovsdb:value": 'flow'
+          "ovsdb:bridge-other-configs":
+            - bridge-other-config-key: 'datapath-id'
+              bridge-other-config-value: '{{local_endpoint["datapath_id"]}}'

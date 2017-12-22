@@ -1,0 +1,257 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+description: >
+  Opendaylight based L3 SDN service
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/4.2/types.yaml
+  - https://raw.githubusercontent.com/Cloudify-PS/cloudify-rest-plugin/master/plugin.yaml
+
+inputs:
+  odl_ip:
+    type: string
+
+  odl_port:
+    type: string
+    default: 8181
+
+  a_endpoint:
+    type: ServiceEndpoint
+
+  z_endpoint:
+    type: ServiceEndpoint
+
+data_types:
+  ServiceEndpoint:
+    properties:
+      node_id:
+        type: string
+
+      node_ip:
+        type: string
+
+      bridge_id:
+        type: string
+
+      bridge_interface_name:
+        type: string
+
+      bridge_interface_mac:
+        type: string
+
+      bridge_interface_ip:
+        type: string
+
+      instance_interface_mac:
+        type: string
+
+      subnet_cidr:
+        type: string
+
+      vtep_name:
+        type: string
+
+      vtep_ip:
+        type: string
+
+      datapath_id:
+        type: string
+
+node_templates:
+  ovsdb_add_nodes_and_bridges_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          inputs:
+            template_file: restconf/ovsdb_add_nodes_and_bridges.yaml
+            params:
+              a_endpoint: { get_input: a_endpoint }
+              z_endpoint: { get_input: z_endpoint }
+
+  ovsdb_configure_a_endpoint_device_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          inputs:
+            template_file: restconf/ovsdb_configure_bridge.yaml
+            params:
+              controller_ip: { get_input: odl_ip }
+              local_endpoint: { get_input: a_endpoint }
+              remote_endpoint: { get_input: z_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_add_nodes_and_bridges_request
+
+  ovsdb_configure_z_endpoint_device_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          inputs:
+            template_file: restconf/ovsdb_configure_bridge.yaml
+            params:
+              controller_ip: { get_input: odl_ip }
+              local_endpoint: { get_input: z_endpoint }
+              remote_endpoint: { get_input: a_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_add_nodes_and_bridges_request
+
+  openflow_add_flows_for_a_endpoint_device_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          inputs:
+            template_file: restconf/openflow_add_flows.yaml
+            params:
+              openflow_id: 1
+              local_endpoint: { get_input: a_endpoint }
+              remote_endpoint: { get_input: z_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_configure_a_endpoint_device_request
+
+  openflow_add_flows_for_z_endpoint_device_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          inputs:
+            template_file: restconf/openflow_add_flows.yaml
+            params:
+              openflow_id: 2
+              local_endpoint: { get_input: z_endpoint }
+              remote_endpoint: { get_input: a_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_configure_z_endpoint_device_request
+      - type: cloudify.relationships.connected_to
+        target: openflow_add_flows_for_a_endpoint_device_request
+
+  openflow_delete_flows_for_a_endpoint_device_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        stop:
+          inputs:
+            template_file: restconf/openflow_delete_flows.yaml
+            params:
+              openflow_id: 1
+              endpoint: { get_input: a_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: openflow_add_flows_for_a_endpoint_device_request
+
+  openflow_delete_flows_for_z_endpoint_device_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        stop:
+          inputs:
+            template_file: restconf/openflow_delete_flows.yaml
+            params:
+              openflow_id: 2
+              endpoint: { get_input: z_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: openflow_add_flows_for_z_endpoint_device_request
+
+  ovsdb_delete_bridge_a_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        stop:
+          inputs:
+            template_file: restconf/ovsdb_delete_bridge.yaml
+            params:
+              endpoint: { get_input: a_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_configure_a_endpoint_device_request
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_add_nodes_and_bridges_request
+      - type: cloudify.relationships.connected_to
+        target: openflow_delete_flows_for_a_endpoint_device_request
+
+  ovsdb_delete_bridge_z_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        stop:
+          inputs:
+            template_file: restconf/ovsdb_delete_bridge.yaml
+            params:
+              endpoint: { get_input: z_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_configure_z_endpoint_device_request
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_add_nodes_and_bridges_request
+      - type: cloudify.relationships.connected_to
+        target: openflow_delete_flows_for_z_endpoint_device_request
+
+  ovsdb_delete_node_a_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        stop:
+          inputs:
+            template_file: restconf/ovsdb_delete_node.yaml
+            params:
+              endpoint: { get_input: a_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_delete_bridge_a_request
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_add_nodes_and_bridges_request
+
+  ovsdb_delete_node_z_request:
+    type: cloudify.rest.Requests
+    properties:
+      hosts: [ { get_input: odl_ip } ]
+      port: { get_input: odl_port }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        stop:
+          inputs:
+            template_file: restconf/ovsdb_delete_node.yaml
+            params:
+              endpoint: { get_input: z_endpoint }
+    relationships:
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_delete_bridge_z_request
+      - type: cloudify.relationships.connected_to
+        target: ovsdb_add_nodes_and_bridges_request

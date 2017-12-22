@@ -1,0 +1,17 @@
+rest_calls:
+  - path: '/restconf/config/network-topology:network-topology/topology/ovsdb:1'
+    method: POST
+    headers:
+      Content-type : 'application/json'
+      authorization: 'Basic YWRtaW46YWRtaW4='
+    response_format: raw
+    payload:
+      node:
+        - node-id: '{{a_endpoint["node_id"]}}'
+          connection-info:
+            remote-ip: '{{a_endpoint["node_ip"]}}'
+            remote-port: 6640
+        - node-id: '{{z_endpoint["node_id"]}}'
+          connection-info:
+            remote-ip: '{{z_endpoint["node_ip"]}}'
+            remote-port: 6640
