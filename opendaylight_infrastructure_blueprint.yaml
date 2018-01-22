@@ -158,7 +158,8 @@ node_templates:
       subnet:
         ip_version: 4
         cidr: { get_input: a_end_subnet_cidr }
-        dns_nameservers: ['8.8.4.4', '8.8.8.8']
+        gateway_ip: ~
+        dns_nameservers: ~
       resource_id: { concat: [{ get_input: prefix }, '_a_end_subnet'] }
       openstack_config: *openstack_config
     relationships:
@@ -177,7 +178,8 @@ node_templates:
       subnet:
         ip_version: 4
         cidr: { get_input: transit_subnet_cidr }
-        dns_nameservers: ['8.8.4.4', '8.8.8.8']
+        gateway_ip: ~
+        dns_nameservers: ~
       resource_id: { concat: [{ get_input: prefix }, '_transit_subnet'] }
       openstack_config: *openstack_config
     relationships:
@@ -196,7 +198,8 @@ node_templates:
       subnet:
         ip_version: 4
         cidr: { get_input: z_end_subnet_cidr }
-        dns_nameservers: ['8.8.4.4', '8.8.8.8']
+        gateway_ip: ~
+        dns_nameservers: ~
       resource_id: { concat: [{ get_input: prefix }, '_z_end_subnet'] }
       openstack_config: *openstack_config
     relationships:

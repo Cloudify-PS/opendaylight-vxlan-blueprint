@@ -12,20 +12,42 @@ node_templates:
             sudo: ['ALL=(ALL) NOPASSWD:ALL']
             ssh-authorized-keys:
               - { get_secret: odl_key_public }
+        yum_repos:
+          naulinux-extras:
+            baseurl: http://downloads.naulinux.ru/pub/NauLinux/7/$basearch/Extras/RPMS/
+            enabled: true
+            gpgcheck: true
+            gpgkey: http://downloads.naulinux.ru/pub/NauLinux/RPM-GPG-KEY-linux-ink
+            name: NauLinux Extras
         write_files:
-          - path: /etc/yum.repos.d/naulinux-extras.repo
+          - path: /etc/sysconfig/network-scripts/ifcfg-eth1
             owner: root:root
-            permissions: '0444'
+            permissions: '0644'
             content: |
-              [naulinux-extras]
-              name=NauLinux Extras
-              baseurl=http://downloads.naulinux.ru/pub/NauLinux/7/$basearch/Extras/RPMS/
-              enabled=0
-              gpgcheck=1
-              gpgkey=http://downloads.naulinux.ru/pub/NauLinux/RPM-GPG-KEY-linux-ink
+              DEVICE="eth1"
+              BOOTPROTO="dhcp"
+              ONBOOT="yes"
+              TYPE="Ethernet"
+              USERCTL="yes"
+              PEERDNS="no"
+              IPV6INIT="no"
+              PERSISTENT_DHCLIENT="1"
+          - path: /etc/sysconfig/network-scripts/ifcfg-eth2
+            owner: root:root
+            permissions: '0644'
+            content: |
+              DEVICE="eth2"
+              BOOTPROTO="dhcp"
+              ONBOOT="yes"
+              TYPE="Ethernet"
+              USERCTL="yes"
+              PEERDNS="no"
+              IPV6INIT="no"
+              PERSISTENT_DHCLIENT="1"
+        packages:
+          - openvswitch
         runcmd:
-          - [dhclient]
-          - [yum, -y, --enablerepo=naulinux-extras, install, openvswitch]
+          - [systemctl, restart, network]
           - [/usr/share/openvswitch/scripts/ovs-ctl, start]
           - [ovs-vsctl, set-manager, 'ptcp:6640']
 
@@ -44,7 +66,7 @@ node_templates:
           - [wget]
           - [java-1.8.0-openjdk]
         runcmd:
-          - [dhclient]
+          - [systemctl, restart , network]
           - [cd, /home/centos]
           - [wget, "https://nexus.opendaylight.org/content/repositories/public/org/opendaylight/integration/distribution-karaf/0.6.2-Carbon/distribution-karaf-0.6.2-Carbon.tar.gz"]
           - [tar, -xf, distribution-karaf-0.6.2-Carbon.tar.gz]
@@ -64,8 +86,21 @@ node_templates:
               - { get_secret: odl_key_public }
         packages:
           - [screen]
+        write_files:
+          - path: /etc/sysconfig/network-scripts/ifcfg-eth1
+            owner: root:root
+            permissions: '0644'
+            content: |
+              DEVICE="eth1"
+              BOOTPROTO="dhcp"
+              ONBOOT="yes"
+              TYPE="Ethernet"
+              USERCTL="yes"
+              PEERDNS="no"
+              IPV6INIT="no"
+              PERSISTENT_DHCLIENT="1"
         runcmd:
-          - [dhclient]
+          - [systemctl, restart, network]
           - [screen, -d, -m, python, -m, SimpleHTTPServer, 8080]
 
   client_cloud_config:
@@ -79,5 +114,18 @@ node_templates:
             sudo: ['ALL=(ALL) NOPASSWD:ALL']
             ssh-authorized-keys:
               - { get_secret: odl_key_public }
+        write_files:
+          - path: /etc/sysconfig/network-scripts/ifcfg-eth1
+            owner: root:root
+            permissions: '0644'
+            content: |
+              DEVICE="eth1"
+              BOOTPROTO="dhcp"
+              ONBOOT="yes"
+              TYPE="Ethernet"
+              USERCTL="yes"
+              PEERDNS="no"
+              IPV6INIT="no"
+              PERSISTENT_DHCLIENT="1"
         runcmd:
-          - [dhclient]
+          - [systemctl, restart, network]
