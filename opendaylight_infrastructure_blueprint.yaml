@@ -32,7 +32,7 @@ dsl_definitions:
     password: { get_secret: keystone_password }
     tenant_name: { get_secret: keystone_tenant_name }
     auth_url: { get_secret: keystone_url }
-    region: RegionOne
+    region: { get_secret: keystone_region }
 
 node_templates:
   # Security groups

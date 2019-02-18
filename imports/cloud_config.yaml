@@ -11,7 +11,7 @@ node_templates:
             shell: /bin/bash
             sudo: ['ALL=(ALL) NOPASSWD:ALL']
             ssh-authorized-keys:
-              - { get_secret: odl_key_public }
+              - { get_secret: agent_key_public }
         yum_repos:
           naulinux-extras:
             baseurl: http://downloads.naulinux.ru/pub/NauLinux/7/$basearch/Extras/RPMS/
@@ -61,7 +61,7 @@ node_templates:
             shell: /bin/bash
             sudo: ['ALL=(ALL) NOPASSWD:ALL']
             ssh-authorized-keys:
-              - { get_secret: odl_key_public }
+              - { get_secret: agent_key_public }
         packages:
           - [wget]
           - [java-1.8.0-openjdk]
@@ -83,7 +83,7 @@ node_templates:
             shell: /bin/bash
             sudo: ['ALL=(ALL) NOPASSWD:ALL']
             ssh-authorized-keys:
-              - { get_secret: odl_key_public }
+              - { get_secret: agent_key_public }
         packages:
           - [screen]
         write_files:
@@ -113,7 +113,7 @@ node_templates:
             shell: /bin/bash
             sudo: ['ALL=(ALL) NOPASSWD:ALL']
             ssh-authorized-keys:
-              - { get_secret: odl_key_public }
+              - { get_secret: agent_key_public }
         write_files:
           - path: /etc/sysconfig/network-scripts/ifcfg-eth1
             owner: root:root
