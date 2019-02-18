@@ -4,9 +4,9 @@ description: >
   Blueprint setup OpenDaylight, 2 OvSes, client and server on OpenStack
 
 imports:
-  - http://www.getcloudify.org/spec/cloudify/4.3.2/types.yaml
-  - http://www.getcloudify.org/spec/openstack-plugin/2.5.0/plugin.yaml
-  - http://www.getcloudify.org/spec/utilities-plugin/1.4.5/plugin.yaml
+  - http://www.getcloudify.org/spec/cloudify/4.5/types.yaml
+  - plugin:cloudify-openstack-plugin?version=2.14.7
+  - plugin:cloudify-utilities-plugin?version=1.11.2
   - imports/cloud_config.yaml
 
 inputs:
