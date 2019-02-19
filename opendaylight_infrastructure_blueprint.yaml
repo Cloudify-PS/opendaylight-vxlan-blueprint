@@ -10,6 +10,50 @@ imports:
   - imports/cloud_config.yaml
 
 inputs:
+  keystone_username:
+    type: string
+    default: { get_secret: keystone_username }
+
+  keystone_password:
+    type: string
+    default: { get_secret: keystone_password }
+
+  keystone_tenant_name:
+    type: string
+    default: { get_secret: keystone_tenant_name }
+
+  keystone_url:
+    type: string
+    default: { get_secret: keystone_url }
+
+  keystone_region:
+    type: string
+    default:  { get_secret: keystone_region }
+
+  external_network_name:
+    type: string
+    default: { get_secret: external_network_name }
+
+  private_network_name:
+    type: string
+    default: { get_secret: private_network_name }
+
+  centos_core_image:
+    type: string
+    default: { get_secret: centos_core_image }
+
+  small_image_flavor:
+    type: string
+    default: { get_secret: small_image_flavor }
+
+  medium_image_flavor:
+    type: string
+    default: { get_secret: medium_image_flavor }
+
+  ssh_key_public:
+    type: string
+    default: { get_secret: agent_key_public }
+
   prefix:
     type: string
     default: 'demo_sdn'
@@ -28,11 +72,11 @@ inputs:
 
 dsl_definitions:
   openstack_config: &openstack_config
-    username: { get_secret: keystone_username }
-    password: { get_secret: keystone_password }
-    tenant_name: { get_secret: keystone_tenant_name }
-    auth_url: { get_secret: keystone_url }
-    region: { get_secret: keystone_region }
+    username: { get_input: keystone_username }
+    password: { get_input: keystone_password }
+    tenant_name: { get_input: keystone_tenant_name }
+    auth_url: { get_input: keystone_url }
+    region: { get_input: keystone_region }
 
 node_templates:
   # Security groups
@@ -331,35 +375,35 @@ node_templates:
     type: cloudify.openstack.nodes.FloatingIP
     properties:
       floatingip:
-        floating_network_name: { get_secret: external_network_name }
+        floating_network_name: { get_input: external_network_name }
       openstack_config: *openstack_config
 
   ovs_z_floating_ip:
     type: cloudify.openstack.nodes.FloatingIP
     properties:
       floatingip:
-        floating_network_name: { get_secret: external_network_name }
+        floating_network_name: { get_input: external_network_name }
       openstack_config: *openstack_config
 
   odl_floating_ip:
     type: cloudify.openstack.nodes.FloatingIP
     properties:
       floatingip:
-        floating_network_name: { get_secret: external_network_name }
+        floating_network_name: { get_input: external_network_name }
       openstack_config: *openstack_config
       
   server_floating_ip:
     type: cloudify.openstack.nodes.FloatingIP
     properties:
       floatingip:
-        floating_network_name: { get_secret: external_network_name }
+        floating_network_name: { get_input: external_network_name }
       openstack_config: *openstack_config
 
   client_floating_ip:
     type: cloudify.openstack.nodes.FloatingIP
     properties:
       floatingip:
-        floating_network_name: { get_secret: external_network_name }
+        floating_network_name: { get_input: external_network_name }
       openstack_config: *openstack_config
 
   # VMs
@@ -368,7 +412,7 @@ node_templates:
     properties:
       agent_config:
         install_method: none
-      management_network_name: { get_secret: private_network_name }
+      management_network_name: { get_input: private_network_name }
       resource_id: { concat: [{ get_input: prefix }, '_server'] }
       openstack_config: *openstack_config
     interfaces:
@@ -376,8 +420,8 @@ node_templates:
         create:
           inputs:
             args:
-              image: { get_secret: centos_core_image }
-              flavor: { get_secret: small_image_flavor }
+              image: { get_input: centos_core_image }
+              flavor: { get_input: small_image_flavor }
               userdata: { get_attribute: [ server_cloud_config, cloud_config ] }
     relationships:
       - type: cloudify.openstack.server_connected_to_port
@@ -392,7 +436,7 @@ node_templates:
     properties:
       agent_config:
         install_method: none
-      management_network_name: { get_secret: private_network_name }
+      management_network_name: { get_input: private_network_name }
       resource_id: { concat: [{ get_input: prefix }, '_client'] }
       openstack_config: *openstack_config
     interfaces:
@@ -400,8 +444,8 @@ node_templates:
         create:
           inputs:
             args:
-              image: { get_secret: centos_core_image }
-              flavor: { get_secret: small_image_flavor }
+              image: { get_input: centos_core_image }
+              flavor: { get_input: small_image_flavor }
               userdata: { get_attribute: [ client_cloud_config, cloud_config ] }
     relationships:
       - type: cloudify.openstack.server_connected_to_port
@@ -416,7 +460,7 @@ node_templates:
     properties:
       agent_config:
         install_method: none
-      management_network_name: { get_secret: private_network_name }
+      management_network_name: { get_input: private_network_name }
       resource_id: { concat: [{ get_input: prefix }, '_ovs_a'] }
       openstack_config: *openstack_config
     interfaces:
@@ -424,8 +468,8 @@ node_templates:
         create:
           inputs:
             args:
-              image: { get_secret: centos_core_image }
-              flavor: { get_secret: small_image_flavor }
+              image: { get_input: centos_core_image }
+              flavor: { get_input: small_image_flavor }
               userdata: { get_attribute: [ ovs_cloud_config, cloud_config ] }
     relationships:
       - type: cloudify.openstack.server_connected_to_port
@@ -446,7 +490,7 @@ node_templates:
     properties:
       agent_config:
         install_method: none
-      management_network_name: { get_secret: private_network_name }
+      management_network_name: { get_input: private_network_name }
       resource_id: { concat: [{ get_input: prefix }, '_ovs_z'] }
       openstack_config: *openstack_config
     interfaces:
@@ -454,8 +498,8 @@ node_templates:
         create:
           inputs:
             args:
-              image: { get_secret: centos_core_image }
-              flavor: { get_secret: small_image_flavor }
+              image: { get_input: centos_core_image }
+              flavor: { get_input: small_image_flavor }
               userdata: { get_attribute: [ ovs_cloud_config, cloud_config ] }
     relationships:
       - type: cloudify.openstack.server_connected_to_port
@@ -476,7 +520,7 @@ node_templates:
     properties:
       agent_config:
         install_method: none
-      management_network_name: { get_secret: private_network_name }
+      management_network_name: { get_input: private_network_name }
       resource_id: { concat: [{ get_input: prefix }, '_odl'] }
       openstack_config: *openstack_config
     interfaces:
@@ -484,8 +528,8 @@ node_templates:
         create:
           inputs:
             args:
-              image: { get_secret: centos_core_image }
-              flavor: { get_secret: medium_image_flavor }
+              image: { get_input: centos_core_image }
+              flavor: { get_input: medium_image_flavor }
               userdata: { get_attribute: [ odl_cloud_config, cloud_config ] }
     relationships:
       - type: cloudify.openstack.server_connected_to_security_group
@@ -554,3 +598,7 @@ outputs:
       z_end_ovs: { get_attribute: [ ovs_z_floating_ip, floating_ip_address ] }
       server: { get_attribute: [ server_floating_ip, floating_ip_address ] }
       odl: { get_attribute: [ odl_floating_ip, floating_ip_address ] }
+  client_check_commands:
+    value:
+      - { concat: ['ping ', { get_attribute: [ server_port, fixed_ip_address ] } ] }
+      - { concat: ['curl http://', { get_attribute: [ server_port, fixed_ip_address ] }, ':8080' ] }

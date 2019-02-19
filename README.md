@@ -27,6 +27,8 @@ Additional files:
 * ***imports/cloud_config.yaml*** - file that holds CloudConfigs for all VMs.
 * ***restconf/\*.yaml*** - YAML HTTP RESTCONF request templates used to configure ODL 
 
+In this example ***Opendaylight v.0.6.2-Carbon*** is used. 
+
 ## Demo
 
 ### Prerequisites
@@ -81,12 +83,16 @@ However, it is also possible to run it on standalone Cloudify Manager.
     
     This blueprint creates setup described in Overview section.
 
-2) Wait a while after deployment successful installation. 
-There are a lot of configuration going on different VMs.
-Those are pushed with *cloudify.nodes.CloudInit.CloudConfig* and Cloudify doesn’t wait till end of the execution so even after deployment installation some configuration are not pushed.
-It should take around 10 minutes.
+2) **IMPORTANT !**
 
-3) Check outputs for *odl_infrastructure* deployment. Get *service_configuration_inputs* from outputs and use it as inputs for ODL configuration deployment.
+    Wait about 10 mins after deployment installation is succeeded. 
+    There are a lot of configuration activities being still in progress (even when deployment instalation has ended).
+    This is because of Cloud Init usage - Cloudify doesn’t wait till end of the execution so even after deployment installation some configuration activities are not done.
+    
+    ***This step should be finally removed when issue#6 will be closed***
+
+3) Check outputs for ***odl_infrastructure*** deployment. 
+   Get ***service_configuration_inputs*** output and use its entries as inputs for ***opendaylight_service_configuration_blueprint*** deployment creation in ***step 4***.
      
     ```
         cfy deployments outputs odl_infrastructure
@@ -94,13 +100,14 @@ It should take around 10 minutes.
 
 4) Run Cloudify configuration blueprint.
     ```
-        cfy install opendaylight_service_configuration_blueprint.yaml -b odl_service -i inputs.yaml
+        cfy install opendaylight_service_configuration_blueprint.yaml -b odl_service -i odl_ip="<value>" -i odl_port="<value>" -i a_endpoint="<value>" -i z_endpoint="<value>"
     ```
 
 5) **IMPORTANT !**
 
-    Before next step please take *server_config* CLI commands from outputs obtained in previous server and execute it on server VM using SSH.
-    Please do the same with client VM and *client_config* outputs. 
+    Take ***server_config*** output of ***odl_infrastructure*** deployment.
+    Execute CLI commands specified in this outputs on ***server VM*** using SSH.
+    Do the same with ***client VM*** and ***client_config*** outputs. 
     These commands sets ARP table entry and IP route necessary to reach server from client and client from server.
     SSH command should be:
     
@@ -108,9 +115,11 @@ It should take around 10 minutes.
         ssh centos@<floating_ip_of_vm> -i <path_to_private_key_for_odl_key_pair>
     ```
 
-    Floating IPs you can find in *access* output
+    Floating IPs you can find in ***access*** output of ***odl_infrastructure*** deployment.
+    
+    ***This step should be finally removed when issue#7 will be closed***
 
-6) Check service configuration (you can use them also before and after provisioning to check if there are no configuration on OvSes):
+6) Check service configuration (you can also use these commands to check behaviour before and after installation of service blueprint):
 
     * OVS A:
     ```
@@ -126,20 +135,20 @@ It should take around 10 minutes.
         ovs-ofctl dump-flows Z
     ```
 
-    * Client:
+    * Client - commands defined in ***client_check_commands*** infrastructure deployment outputs. Should be:
     ```
-        ping <IP from z_edn_network of server> 
-        curl http://<IP from z_edn_network of server>:8000
+        ping <server IP from z_edn_network> 
+        curl http://<server IP from z_edn_network>:8000
     ```
 
-    IP address you can get from infrastructure deployment outputs: *topology > z_end_network > server*
+    IP address you can also get from infrastructure deployment outputs: ***topology > z_end_network > server***
 
 7) Uninstall blueprints
 
-```
-    cfy uninstall odl_service -p ignore_failure=True
-    cfy uninstall odl_infrastructure -p ignore_failure=True   
-```
+    ```
+        cfy uninstall odl_service
+        cfy uninstall odl_infrastructure
+    ```
 
 ## Troubleshooting
 
